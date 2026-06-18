@@ -1,0 +1,30 @@
+# 의존성 / 빌드 산출물
+node_modules
+dist
+.vite
+
+# 로그 · OS · 에디터
+*.log
+.DS_Store
+.vscode/
+.idea/
+
+# 환경 변수
+.env
+.env.*
+!.env.example
+
+# 런타임 데이터 (세션·SQLite DB·점검 대상 URL) — 예시 파일만 추적
+data/*
+!data/pages.example.json
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# 로컬 시드 스크립트
+scripts/
+
+# 로컬 도구 설정
+settings.local.json

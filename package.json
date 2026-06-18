@@ -1,0 +1,40 @@
+{
+  "name": "page-monitor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "서버 기반 페이지 모니터링 — Playwright 헤드리스로 로그인 상태 진입 점검",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "concurrently -n server,web -c blue,green \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:server": "tsx watch server/index.ts",
+    "dev:web": "vite",
+    "build": "tsc --noEmit && vite build",
+    "start": "tsx server/index.ts",
+    "login": "tsx server/login.ts"
+  },
+  "dependencies": {
+    "@fastify/static": "^8.3.0",
+    "better-sqlite3": "^11.8.1",
+    "fastify": "^5.2.1",
+    "node-cron": "^3.0.3",
+    "p-limit": "^6.2.0",
+    "playwright": "^1.60.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.13.1",
+    "@types/node-cron": "^3.0.11",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vite": "^5.4.14"
+  }
+}

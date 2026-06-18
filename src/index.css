@@ -1,0 +1,1271 @@
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #1c2028;
+  color: #e6e8ec;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 14px;
+}
+
+.wrap {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px 20px 60px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+h1 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+button {
+  background: #2a3038;
+  color: #e6e8ec;
+  border: 1px solid #3a4150;
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.primary {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: #fff;
+  font-weight: 600;
+}
+
+.badge {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid #3a4150;
+}
+
+.badge.green {
+  color: #4ade80;
+  border-color: #2f5e44;
+}
+
+.badge.gray {
+  color: #9aa6b8;
+}
+
+.badge.auto-on {
+  color: #93c5fd;
+  border-color: #3b5bdb;
+}
+
+.error {
+  background: #3a1d1d;
+  border: 1px solid #7f1d1d;
+  color: #fca5a5;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+
+/* 알림 토스트 — 화면 하단 중앙에 잠깐 떴다 자동으로 사라짐(클릭 시 즉시 닫힘). 에러=빨강 / 성공=초록 */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  max-width: 90vw;
+  border-radius: 8px;
+  padding: 12px 18px;
+  font-size: 13px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  z-index: 1000;
+  cursor: pointer;
+  animation: toast-in 0.18s ease-out;
+}
+.toast.error {
+  background: #3a1d1d;
+  border: 1px solid #7f1d1d;
+  color: #fca5a5;
+}
+.toast.ok {
+  background: #14321f;
+  border: 1px solid #2f5e44;
+  color: #6ee7a0;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.addform {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.addform input[type='text'],
+.addform input:not([type]) {
+  background: #14161a;
+  color: #e6e8ec;
+  border: 1px solid #3a4150;
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+/* 직접 자식(>)으로 한정 — 안 그러면 .chk 안의 체크박스(label 의 first-child)에도
+   flex:1/min-width 가 걸려 체크박스와 '로그인 필요' 텍스트가 벌어져 보인다. */
+.addform > input:first-child {
+  flex: 1;
+  min-width: 220px;
+}
+
+.chk {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+.chk input[type='checkbox'] {
+  flex: none;
+  width: auto;
+  min-width: 0;
+  margin: 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid #2a3038;
+  vertical-align: top;
+}
+
+th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.6;
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 상태 컬럼 — 헤더 '상태' 글자 밑에 동그라미를 가운데로 */
+.status-col,
+.status-cell {
+  text-align: center;
+}
+
+.label {
+  font-weight: 600;
+}
+
+.url {
+  display: block;
+  font-size: 11px;
+  opacity: 0.55;
+  word-break: break-all;
+}
+
+/* 클릭 가능한 URL 링크(페이지 현황·로그·API뷰 공통) — 평소엔 본문색, hover 시 파랑+밑줄 */
+.urllink {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+.urllink:hover {
+  color: #93c5fd;
+  text-decoration: underline;
+}
+
+.note {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.empty {
+  text-align: center;
+  opacity: 0.5;
+  padding: 32px;
+}
+
+.hint {
+  font-size: 12px;
+  opacity: 0.45;
+  margin: 0 0 6px;
+}
+
+/* ── 페이지별 호출 API 목록 (행 클릭 시 펼침) ── */
+.page-row {
+  cursor: pointer;
+}
+.page-row:hover {
+  background: #232831;
+}
+.caret {
+  display: inline-block;
+  width: 12px;
+  font-size: 10px;
+  opacity: 0.6;
+}
+button.del {
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  font-size: 14px;
+  opacity: 0.4;
+  line-height: 1;
+}
+button.del:hover {
+  opacity: 1;
+  background: #3a1d1d;
+  border-radius: 4px;
+}
+/* 행 액션(이름 수정/저장/취소/삭제) — 한 칸에 나란히 */
+.row-actions {
+  white-space: nowrap;
+}
+button.iconbtn {
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  font-size: 14px;
+  opacity: 0.4;
+  line-height: 1;
+  cursor: pointer;
+}
+button.iconbtn:hover {
+  opacity: 1;
+  background: #232831;
+  border-radius: 4px;
+}
+.rename-input {
+  font: inherit;
+  font-weight: 600;
+  width: 100%;
+  max-width: 260px;
+  padding: 3px 6px;
+  background: #11151b;
+  color: inherit;
+  border: 1px solid #3a4250;
+  border-radius: 4px;
+}
+.rename-input:focus {
+  outline: none;
+  border-color: #4f7cff;
+}
+.rename-input.grp {
+  max-width: 120px;
+  font-weight: 400;
+}
+
+.api-row > td {
+  padding: 0;
+  background: #161a20;
+  border-bottom: 2px solid #2a3038;
+}
+.api-list {
+  padding: 8px 14px 12px 40px;
+}
+.api-head {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.55;
+  margin: 6px 0 8px;
+}
+.api-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid #21262e;
+  font-size: 12.5px;
+}
+.api-item:last-child {
+  border-bottom: none;
+}
+.api-method {
+  flex: 0 0 auto;
+  min-width: 44px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #2a3038;
+  color: #93c5fd;
+}
+.api-method.post {
+  color: #fcd34d;
+}
+.api-method.delete,
+.api-method.put {
+  color: #fca5a5;
+}
+.api-path {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+  color: #cbd5e1;
+}
+.api-meta {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.api-status {
+  font-weight: 600;
+}
+.api-status.ok {
+  color: #4ade80;
+}
+.api-status.bad {
+  color: #fca5a5;
+}
+.api-ms {
+  opacity: 0.6;
+}
+.api-hits {
+  opacity: 0.45;
+  font-size: 11px;
+}
+
+/* ── API 단건 GET 테스트(행의 '테스트' 버튼 + 결과) ── */
+.api-test-wrap {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 2px;
+}
+.api-test {
+  flex: 0 0 auto;
+  background: #232a36;
+  border: 1px solid #3a4150;
+  color: #93c5fd;
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 5px;
+  cursor: pointer;
+  line-height: 1.2;
+}
+.api-test:hover {
+  background: #2c3645;
+}
+.api-test-result {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.api-test-result.ok {
+  color: #4ade80;
+}
+.api-test-result.bad {
+  color: #f87171;
+}
+.api-test-result.exp {
+  color: #94a3b8;
+}
+/* 자동 감지 헤더 옆 'GET만 테스트' 안내(대문자/자간 해제) */
+.api-test-hint {
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: 0.7;
+  font-size: 10.5px;
+}
+/* 테스트 결과 옆 '응답 보기' 버튼 */
+.api-body-btn {
+  flex: 0 0 auto;
+  background: none;
+  border: none;
+  color: #93c5fd;
+  font-size: 11px;
+  padding: 2px 4px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.api-body-btn:hover {
+  color: #bfdbfe;
+}
+/* 응답 본문 모달 — 넓게 + 스크롤 pre */
+.api-body-modal {
+  width: 100%;
+  max-width: 720px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+.api-body-url {
+  font-size: 11px;
+  opacity: 0.55;
+  word-break: break-all;
+  margin-bottom: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+/* 테스트 모달 — 호출 진행 중 스피너 영역 */
+.api-body-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 30px 12px;
+  font-size: 13px;
+  opacity: 0.85;
+}
+.api-body-spin {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  border: 2px solid #3a4150;
+  border-top-color: #93c5fd;
+  border-radius: 50%;
+  animation: api-spin 0.7s linear infinite;
+}
+@keyframes api-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* 테스트 모달의 실패/인증필요 사유 — 본문 위에 빨간 배너 */
+.api-body-error {
+  font-size: 12px;
+  color: #fca5a5;
+  background: #2a1416;
+  border: 1px solid #4a2025;
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  word-break: break-word;
+}
+.api-body-pre {
+  flex: 1;
+  overflow: auto;
+  margin: 0;
+  padding: 10px 12px;
+  background: #11151b;
+  border: 1px solid #2a3038;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #cbd5e1;
+}
+.api-body-foot {
+  margin-top: 8px;
+  font-size: 11px;
+  opacity: 0.5;
+}
+/* 호출 불가 사유 배지(동적·자동 불가 / 사용자: 호출 끔 / 비GET) — 회색, 비활성 느낌 */
+.api-na {
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+/* 테스트 가부 셀렉트(테스트 허용/불가) — 비GET·교차사이트는 disabled 로 '테스트 불가' 고정 */
+.callable-select {
+  flex: 0 0 auto;
+  background: #232a36;
+  border: 1px solid #3a4150;
+  color: #cbd5e1;
+  font-size: 11px;
+  padding: 2px 4px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.callable-select:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.api-loading,
+.api-empty {
+  padding: 12px 14px 12px 40px;
+  opacity: 0.5;
+  font-size: 12.5px;
+}
+/* 자동 감지된 API 와 구분되는 '수동 등록' 섹션 */
+.api-head.manual {
+  margin-top: 18px;
+  color: #c4b5fd;
+  opacity: 0.8;
+}
+.api-item.manual .api-path {
+  color: #ddd6fe;
+}
+.api-del {
+  flex: 0 0 auto;
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0.4;
+  font-size: 13px;
+  padding: 0 4px;
+  line-height: 1;
+}
+.api-del:hover {
+  opacity: 1;
+}
+.manual-api-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  align-items: center;
+}
+.manual-api-form select {
+  flex: 0 0 auto;
+  background: #14161a;
+  color: #e6e8ec;
+  border: 1px solid #3a4150;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+.manual-api-form input {
+  flex: 1;
+  background: #14161a;
+  color: #e6e8ec;
+  border: 1px solid #3a4150;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.manual-api-form button {
+  flex: 0 0 auto;
+  font-size: 12px;
+  padding: 6px 12px;
+}
+.manual-json {
+  margin-top: 8px;
+}
+.manual-json-toggle {
+  background: none;
+  border: none;
+  color: #c4b5fd;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 0;
+  opacity: 0.8;
+}
+.manual-json-toggle:hover {
+  opacity: 1;
+}
+.manual-json-body {
+  margin-top: 8px;
+}
+.manual-json-body textarea {
+  width: 100%;
+  min-height: 110px;
+  background: #14161a;
+  color: #e6e8ec;
+  border: 1px solid #3a4150;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.manual-json-body code {
+  background: #2a3038;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+.manual-json-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+.manual-json-actions button {
+  font-size: 12px;
+  padding: 6px 14px;
+}
+
+/* ── 점검 추이 스파크라인 (펼침 영역 상단) ── */
+.trend {
+  padding: 10px 14px 6px 40px;
+  border-bottom: 1px solid #21262e;
+}
+.trend-head {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.55;
+  margin-bottom: 4px;
+}
+.trend-tip {
+  text-transform: none;
+  letter-spacing: 0;
+  margin-left: 10px;
+  color: #93c5fd;
+  opacity: 0.95;
+}
+.trend-tip b {
+  color: #e6e8ec;
+}
+/* SVG 라인차트 */
+.trend-svg {
+  width: 100%;
+  display: block;
+}
+.trend-line {
+  fill: none;
+  stroke: #3b82f6;
+  stroke-width: 1.5;
+}
+.th-warn {
+  stroke: #fbbf24;
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  opacity: 0.55;
+}
+.th-crit {
+  stroke: #f87171;
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  opacity: 0.55;
+}
+.th-label {
+  font-size: 8.5px;
+}
+.th-label.warn {
+  fill: #fbbf24;
+  opacity: 0.85;
+}
+.th-label.crit {
+  fill: #f87171;
+  opacity: 0.85;
+}
+.ax-line {
+  stroke: #2a3038;
+  stroke-width: 1;
+}
+.ax-label {
+  fill: #64748b;
+  font-size: 8.5px;
+}
+.hover-v {
+  stroke: #64748b;
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+}
+.pt {
+  stroke: #161a20;
+  stroke-width: 0.5;
+}
+.pt.ok {
+  fill: #4ade80;
+}
+.pt.slow {
+  fill: #fbbf24;
+}
+.pt.crit {
+  fill: #f87171;
+}
+.pt.fail {
+  fill: #dc2626;
+}
+.pt.exp {
+  fill: #94a3b8;
+}
+.trend-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  opacity: 0.4;
+  margin-top: 2px;
+}
+
+/* ── JSON 일괄 추가 (추가 탭) ── */
+.jsonimport {
+  margin-top: 18px;
+  padding: 18px 20px;
+  background: #1a1e25;
+  border: 1px solid #2a3038;
+  border-radius: 10px;
+}
+.ji-head {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.ji-hint {
+  font-size: 12px;
+  opacity: 0.55;
+  margin-bottom: 10px;
+}
+.ji-hint code {
+  background: #14161a;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+.ji-text {
+  width: 100%;
+  background: #14161a;
+  color: #e6e8ec;
+  border: 1px solid #3a4150;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.ji-msg {
+  margin: 10px 0;
+  padding: 8px 12px;
+  background: #14161a;
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: #93c5fd;
+}
+.jsonimport button {
+  margin-top: 10px;
+}
+
+/* ── 상단 메인 탭 (조회 / 추가 / 설정) ── */
+.maintabs {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  background: #14161a;
+  border: 1px solid #2a3038;
+  border-radius: 10px;
+  padding: 5px;
+  margin-bottom: 16px;
+}
+.mtab {
+  background: none;
+  border: none;
+  border-radius: 7px;
+  padding: 9px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #9aa6b8;
+}
+.mtab:hover {
+  background: #1f242c;
+  color: #e6e8ec;
+}
+.mtab.on {
+  background: #3b82f6;
+  color: #fff;
+}
+
+/* ── 로그 탭 (일별 막대 + 드릴다운 동그라미) ── */
+.log-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.log-card {
+  background: #1a1e25;
+  border: 1px solid #2a3038;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.log-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.log-id {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.log-label {
+  font-weight: 600;
+  font-size: 14px;
+}
+.log-url {
+  font-size: 11px;
+  opacity: 0.5;
+  word-break: break-all;
+}
+.log-uptime {
+  flex: 0 0 auto;
+  font-size: 12px;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+.daily-bars {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 34px;
+  margin-top: 12px;
+}
+/* 막대 = 그날 점검들의 비율 스택 컨테이너. 색은 안의 .seg(세그먼트)가 비율대로 채운다. */
+.daily-bars .dbar {
+  flex: 1 1 0;
+  min-width: 3px;
+  max-width: 14px;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  overflow: hidden;
+  background: #2a3038; /* 빈 부분(거의 없음) 베이스 */
+  display: flex;
+  flex-direction: column; /* 위→아래로 정상/지연/오류/만료 쌓임 */
+  opacity: 0.9;
+  transition: opacity 0.1s;
+}
+.daily-bars .dbar:hover {
+  opacity: 1;
+}
+.daily-bars .dbar.on {
+  outline: 2px solid #93c5fd;
+  outline-offset: 1px;
+}
+.daily-bars .dbar .seg {
+  width: 100%;
+  flex: 0 0 auto;
+}
+.daily-bars .dbar .seg.ok {
+  background: #4ade80;
+}
+.daily-bars .dbar .seg.slow {
+  background: #fbbf24;
+}
+.daily-bars .dbar .seg.fail {
+  background: #dc2626;
+}
+.daily-bars .dbar .seg.exp {
+  background: #6b7280; /* 세션 만료 = 회색(장애 아님) */
+}
+.daily-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  opacity: 0.4;
+  margin-top: 4px;
+}
+.day-detail {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #2a3038;
+}
+.day-detail-head {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.55;
+  margin-bottom: 10px;
+}
+.dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+/* 점 공통 — 색은 color 로 주고 background:currentColor 라, hover glow(box-shadow:currentColor)가 점 색을 따른다. 모달 헤더의 점도 이걸 공유. */
+.dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+.dot.ok {
+  color: #4ade80;
+}
+.dot.slow {
+  color: #fbbf24;
+}
+.dot.crit {
+  color: #f87171;
+}
+.dot.fail {
+  color: #dc2626;
+}
+.dot.exp {
+  color: #94a3b8;
+}
+.dots .dot {
+  position: relative; /* 커스텀 툴팁(.dot-tip)의 기준 */
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  transition: box-shadow 0.1s;
+}
+/* 불빛 — 점 색으로 빛남(scale 은 빼서 위의 툴팁이 같이 커지지 않게) */
+.dots .dot:hover {
+  box-shadow: 0 0 8px 2px currentColor;
+  z-index: 3;
+}
+
+/* hover 즉시 뜨는 커스텀 툴팁 — 시각·상태·응답시간 + 직전 점검과의 간격('언제부터 에러') */
+.dot-tip {
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #11151b;
+  border: 1px solid #2f3640;
+  border-radius: 6px;
+  padding: 6px 9px;
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: nowrap;
+  color: #e6e8ec; /* dot 의 currentColor 상속을 끊어 글자색 고정 */
+  text-align: left;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+  z-index: 6;
+  pointer-events: none;
+}
+.dot-tip b {
+  color: #fff;
+}
+.dot-tip-gap {
+  color: #93c5fd;
+}
+
+/* ── 점검 상세 모달 ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+.modal-card {
+  background: #1c2129;
+  border: 1px solid #2f3640;
+  border-radius: 12px;
+  padding: 18px 20px;
+  min-width: 320px;
+  max-width: 90vw;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.modal-head strong {
+  font-size: 14px;
+}
+.modal-x {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: 0.5;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.modal-x:hover {
+  opacity: 1;
+  background: #2a3038;
+}
+.modal-body {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 16px;
+  margin: 0;
+  font-size: 13px;
+}
+.modal-body dt {
+  opacity: 0.55;
+}
+.modal-body dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  word-break: break-all;
+}
+.modal-err {
+  color: #fca5a5;
+}
+
+/* ── 설정 탭 ── */
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.setcard {
+  background: #1a1e25;
+  border: 1px solid #2a3038;
+  border-radius: 10px;
+  padding: 18px 20px;
+}
+.setcard h3 {
+  margin: 0 0 14px;
+  font-size: 15px;
+}
+.setrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 0;
+}
+.setrow label {
+  font-size: 13px;
+  opacity: 0.85;
+}
+.setrow input[type='number'],
+.setrow select {
+  background: #14161a;
+  color: #e6e8ec;
+  border: 1px solid #3a4150;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+  width: 220px;
+  font-variant-numeric: tabular-nums;
+}
+.setrow select {
+  cursor: pointer;
+}
+.setrow input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+}
+.setnote {
+  margin-top: 10px;
+  padding: 9px 12px;
+  background: #14161a;
+  border-radius: 6px;
+  font-size: 12px;
+  opacity: 0.65;
+}
+.setactions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #2a3038;
+}
+
+/* ── 보기 전환 탭 (페이지별 ↔ API별) ── */
+.viewtabs {
+  display: flex;
+  gap: 6px;
+  margin: 4px 0 12px;
+}
+.tab {
+  font-size: 13px;
+  padding: 6px 14px;
+}
+.tab.on {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: #fff;
+  font-weight: 600;
+}
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* API별 보기에서 펼친 페이지 목록 */
+.api-pagelabel {
+  flex: 0 0 auto;
+  font-weight: 600;
+  color: #e6e8ec;
+}
+.api-pageurl {
+  flex: 1;
+  font-size: 11px;
+  opacity: 0.5;
+  word-break: break-all;
+}
+
+/* ── 슬랙 알람 탭 ── */
+.slack-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.slack-row > label {
+  opacity: 0.8;
+  font-size: 13px;
+}
+.slack-enable {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.slack-history-btn {
+  font-size: 12px;
+  padding: 6px 12px;
+}
+.slack-modes {
+  display: flex;
+  gap: 6px;
+}
+.modebtn {
+  background: transparent;
+  border: 1px solid #3a4150;
+  color: #a0aec0;
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.modebtn.on {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: #fff;
+}
+.slack-input {
+  width: 100%;
+  background: #14161a;
+  color: #e6e8ec;
+  border: 1px solid #3a4150;
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+.slack-input.num {
+  max-width: 120px;
+}
+.slack-note {
+  margin: 0 0 10px;
+}
+.slack-note code {
+  background: #2a3038;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.slack-test {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+.slack-ok {
+  color: #4ade80;
+  font-size: 12px;
+}
+.slack-bad {
+  color: #f87171;
+  font-size: 12px;
+}
+.slack-skip {
+  color: #9aa6b8;
+  font-size: 12px;
+}
+
+/* 알람 발송 내역 모달 */
+.alarm-modal {
+  width: 100%;
+  max-width: 640px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+.alarm-summary {
+  font-size: 11px;
+  opacity: 0.7;
+  margin-left: 4px;
+}
+.alarm-list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+.alarm-item {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  align-items: start;
+  gap: 10px;
+  padding: 8px 10px;
+  background: #161a20;
+  border: 1px solid #2a3038;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.alarm-icon {
+  text-align: center;
+}
+.alarm-body {
+  min-width: 0;
+}
+.alarm-title {
+  font-weight: 600;
+}
+.alarm-detail {
+  font-size: 11px;
+  opacity: 0.6;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.alarm-status {
+  font-size: 11px;
+  margin-top: 4px;
+}
+.alarm-ts {
+  font-size: 10px;
+  opacity: 0.5;
+  white-space: nowrap;
+}
