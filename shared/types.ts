@@ -18,6 +18,8 @@ export interface CheckResult {
   ok: boolean; // 정상 진입 여부
   error: string | null; // 실패/특이사항 단서
   sessionExpired: boolean; // 로그인 페이지로 튕김 = 세션 만료 (장애 아님)
+  apiFailCount: number; // 점검 중 같은 사이트 API(xhr/fetch)가 5xx/연결실패한 건수 (0 = 없음)
+  body?: string | null; // 실패 시 진단 스냅샷(응답 본문 앞부분 또는 실패 API 요약). 정상/세션만료는 null
 }
 
 export interface SessionStatus {
@@ -105,6 +107,8 @@ export interface HistoryPoint {
   ok: boolean;
   sessionExpired: boolean;
   error?: string | null; // 실패 사유(모달 상세용). checksByDate 만 채움(추이엔 불필요)
+  apiFailCount?: number; // 같은 사이트 API 실패 건수(모달 상세용). checksByDate 만 채움
+  body?: string | null; // 실패 시 응답 본문/요약 스냅샷(모달 상세용). checksByDate 만 채움
 }
 
 // 로그 탭 — 하루치 점검 집계(일별 막대용). 분류는 settings 임계값 기준.
@@ -135,6 +139,7 @@ export interface Settings {
   warningMs: number; // 주의 임계값(ms) — 이 이상이면 🟡
   criticalMs: number; // 심각 임계값(ms) — 이 이상이면 🟠(느림 심각)
   retentionDays: number; // 이력 보관기간(일) — 0 이하면 정리 안 함
+  failOnApiError: boolean; // 켜면 페이지가 호출한 같은 사이트 API 가 5xx/실패면 그 페이지를 실패(❌)로 본다
 }
 
 // 설정 부분 수정용(설정 탭 카드별 저장).

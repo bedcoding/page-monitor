@@ -46,9 +46,13 @@ export function initDb(): Database.Database {
       ok INTEGER NOT NULL,
       error TEXT,
       session_expired INTEGER NOT NULL DEFAULT 0,
+      api_fail_count INTEGER NOT NULL DEFAULT 0,
+      body TEXT,
       FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_checks_page_ts ON checks(page_id, ts DESC);
+    -- 전역 시간범위 스캔(pruneHistory·dailyStats)용 ts 단독 인덱스
+    CREATE INDEX IF NOT EXISTS idx_checks_ts ON checks(ts);
 
     -- 점검 중 수집한 API 호출(같은 method+url 은 1행, hit_count 로 누적)
     CREATE TABLE IF NOT EXISTS api_calls (
@@ -86,7 +90,10 @@ export function initDb(): Database.Database {
       check_interval_min INTEGER NOT NULL DEFAULT 5,
       warning_ms INTEGER NOT NULL DEFAULT 1500,
       critical_ms INTEGER NOT NULL DEFAULT 3000,
-      retention_days INTEGER NOT NULL DEFAULT 90
+      retention_days INTEGER NOT NULL DEFAULT 90,
+      -- 기본 OFF(옵트인): 인증 토큰 갱신·분석 beacon 등 부수 API 의 일시적 5xx 를 페이지 장애로
+      -- 오인(거짓 양성)하기 쉬워, '이 페이지는 API 가 깨지면 진짜 장애'라고 아는 페이지에만 켠다.
+      fail_on_api_error INTEGER NOT NULL DEFAULT 0
     );
     INSERT OR IGNORE INTO settings (id) VALUES (1);
 
@@ -117,6 +124,8 @@ export function initDb(): Database.Database {
       slack_error TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_alarm_page ON alarm_events(page_id, ts);
+    -- 전역 최신순 조회(listAlarmEvents)용 ts 인덱스
+    CREATE INDEX IF NOT EXISTS idx_alarm_events_ts ON alarm_events(ts DESC);
   `);
 
   // 마이그레이션: page_api_calls.source — 'auto'(page.on('response') 자동 감지) / 'manual'(사람이 수동 등록).
@@ -144,6 +153,21 @@ export function initDb(): Database.Database {
   if (!ssCols.some(c => c.name === 'recover_streak')) {
     db.exec('ALTER TABLE slack_settings ADD COLUMN recover_streak INTEGER NOT NULL DEFAULT 2');
   }
+  // 마이그레이션: checks.api_fail_count(같은 사이트 API 실패 건수) + checks.body(실패 시 진단 스냅샷).
+  // 기존 행은 api_fail_count=0, body=NULL.
+  const chkCols = db.prepare('PRAGMA table_info(checks)').all() as { name: string }[];
+  if (!chkCols.some(c => c.name === 'api_fail_count')) {
+    db.exec('ALTER TABLE checks ADD COLUMN api_fail_count INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!chkCols.some(c => c.name === 'body')) {
+    db.exec('ALTER TABLE checks ADD COLUMN body TEXT');
+  }
+  // 마이그레이션: settings.fail_on_api_error — 같은 사이트 API 5xx/실패 시 페이지를 실패로 볼지.
+  // 기본 OFF(0): 옵트인. 부수 API 의 일시적 5xx 를 장애로 오인하는 거짓 양성이 많아서다.
+  const setCols = db.prepare('PRAGMA table_info(settings)').all() as { name: string }[];
+  if (!setCols.some(c => c.name === 'fail_on_api_error')) {
+    db.exec('ALTER TABLE settings ADD COLUMN fail_on_api_error INTEGER NOT NULL DEFAULT 0');
+  }
   return db;
 }
 
@@ -153,6 +177,7 @@ interface SettingsRow {
   warning_ms: number;
   critical_ms: number;
   retention_days: number;
+  fail_on_api_error: number;
 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
@@ -161,7 +186,7 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
 export function getSettings(): Settings {
   const r = db
     .prepare(
-      'SELECT enabled, check_interval_min, warning_ms, critical_ms, retention_days FROM settings WHERE id = 1',
+      'SELECT enabled, check_interval_min, warning_ms, critical_ms, retention_days, fail_on_api_error FROM settings WHERE id = 1',
     )
     .get() as SettingsRow;
   return {
@@ -170,6 +195,7 @@ export function getSettings(): Settings {
     warningMs: r.warning_ms,
     criticalMs: r.critical_ms,
     retentionDays: r.retention_days,
+    failOnApiError: !!r.fail_on_api_error,
   };
 }
 
@@ -185,13 +211,14 @@ export function updateSettings(patch: SettingsPatch): Settings {
   if (next.criticalMs < next.warningMs) next.criticalMs = next.warningMs;
   next.retentionDays = clamp(Math.round(Number(next.retentionDays) || 0), 0, 3650);
   db.prepare(
-    'UPDATE settings SET enabled = ?, check_interval_min = ?, warning_ms = ?, critical_ms = ?, retention_days = ? WHERE id = 1',
+    'UPDATE settings SET enabled = ?, check_interval_min = ?, warning_ms = ?, critical_ms = ?, retention_days = ?, fail_on_api_error = ? WHERE id = 1',
   ).run(
     next.enabled ? 1 : 0,
     next.checkIntervalMin,
     next.warningMs,
     next.criticalMs,
     next.retentionDays,
+    next.failOnApiError ? 1 : 0,
   );
   return getSettings();
 }
@@ -313,11 +340,21 @@ export function importPages(items: unknown[]): { added: number; skipped: number 
 
 export function recordChecks(results: CheckResult[]): void {
   const stmt = db.prepare(
-    'INSERT INTO checks (page_id, ts, status, duration_ms, ok, error, session_expired) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO checks (page_id, ts, status, duration_ms, ok, error, session_expired, api_fail_count, body) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
   );
   const tx = db.transaction((rows: CheckResult[]) => {
     for (const r of rows) {
-      stmt.run(r.pageId, r.ts, r.status, r.durationMs, r.ok ? 1 : 0, r.error, r.sessionExpired ? 1 : 0);
+      stmt.run(
+        r.pageId,
+        r.ts,
+        r.status,
+        r.durationMs,
+        r.ok ? 1 : 0,
+        r.error,
+        r.sessionExpired ? 1 : 0,
+        r.apiFailCount ?? 0,
+        r.body ?? null,
+      );
     }
   });
   tx(results);
@@ -333,13 +370,14 @@ interface LatestRow {
   ok: number;
   error: string | null;
   session_expired: number;
+  api_fail_count: number;
 }
 
-/** 각 page 의 가장 최근 점검 결과 1건씩. */
+/** 각 page 의 가장 최근 점검 결과 1건씩. (body 는 목록에 불필요해 생략 — 모달은 checksByDate 로 받는다) */
 export function latestResults(): CheckResult[] {
   const rows = db
     .prepare(
-      `SELECT c.page_id, p.url, p.label, c.ts, c.status, c.duration_ms, c.ok, c.error, c.session_expired
+      `SELECT c.page_id, p.url, p.label, c.ts, c.status, c.duration_ms, c.ok, c.error, c.session_expired, c.api_fail_count
        FROM checks c
        JOIN pages p ON p.id = c.page_id
        WHERE c.id IN (SELECT MAX(id) FROM checks GROUP BY page_id)
@@ -356,6 +394,7 @@ export function latestResults(): CheckResult[] {
     ok: !!r.ok,
     error: r.error,
     sessionExpired: !!r.session_expired,
+    apiFailCount: r.api_fail_count ?? 0,
   }));
 }
 
@@ -366,18 +405,21 @@ interface HistoryQueryRow {
   ok: number;
   session_expired: number;
   error?: string | null;
+  api_fail_count?: number;
+  body?: string | null;
 }
 
 /** 한 페이지의 최근 점검 이력(추이용). 오래된→최신 순으로 반환(스파크라인 왼→오). */
 export function pageHistory(pageId: number, limit = 30): HistoryPoint[] {
   // 최근 limit 건을 ts DESC 로 뽑은 뒤 뒤집어 시간순으로.
   // 동일 ts(자동/수동 동시 점검) 는 id DESC 로 tie-break 해 순서를 결정적으로.
+  const lim = clamp(Math.round(Number(limit) || 30), 1, 1000); // 사용자 지정 표시 개수 — 폭주 방지 상한 1000
   const rows = db
     .prepare(
       `SELECT ts, status, duration_ms, ok, session_expired
        FROM checks WHERE page_id = ? ORDER BY ts DESC, id DESC LIMIT ?`,
     )
-    .all(pageId, limit) as HistoryQueryRow[];
+    .all(pageId, lim) as HistoryQueryRow[];
   return rows
     .reverse()
     .map(r => ({
@@ -456,7 +498,7 @@ export function dailyStats(pageId: number, days: number): DailyStat[] {
 export function checksByDate(pageId: number, date: string): HistoryPoint[] {
   const rows = db
     .prepare(
-      `SELECT ts, status, duration_ms, ok, session_expired, error
+      `SELECT ts, status, duration_ms, ok, session_expired, error, api_fail_count, body
        FROM checks
        WHERE page_id = ? AND date(ts/1000, 'unixepoch', 'localtime') = ?
        ORDER BY ts, id`,
@@ -469,6 +511,8 @@ export function checksByDate(pageId: number, date: string): HistoryPoint[] {
     ok: !!r.ok,
     sessionExpired: !!r.session_expired,
     error: r.error ?? null,
+    apiFailCount: r.api_fail_count ?? 0,
+    body: r.body ?? null,
   }));
 }
 
@@ -806,14 +850,15 @@ export function listAlarmEvents(limit = 200): AlarmEvent[] {
 }
 
 // 알람 평가용 — 페이지별 최근 N회 점검(최신순). 윈도우 충족 여부와 실패/심각 카운트 계산에 쓴다.
+// status·api_fail_count 도 함께 — 슬랙 메시지에서 '접속 실패'와 '데이터 API 오류(HTML 200·API만 5xx)'를 구분하기 위함.
 export function recentChecksForPage(
   pageId: number,
   n: number,
-): Array<{ id: number; ok: number; durationMs: number; sessionExpired: number }> {
+): Array<{ id: number; ok: number; durationMs: number; sessionExpired: number; status: number; apiFailCount: number }> {
   const lim = clamp(Math.round(Number(n) || 1), 1, 100);
   return db
     .prepare(
-      `SELECT id, ok, duration_ms AS durationMs, session_expired AS sessionExpired
+      `SELECT id, ok, duration_ms AS durationMs, session_expired AS sessionExpired, status, api_fail_count AS apiFailCount
        FROM checks WHERE page_id = ? ORDER BY ts DESC, id DESC LIMIT ?`,
     )
     .all(pageId, lim) as Array<{
@@ -821,6 +866,8 @@ export function recentChecksForPage(
     ok: number;
     durationMs: number;
     sessionExpired: number;
+    status: number;
+    apiFailCount: number;
   }>;
 }
 

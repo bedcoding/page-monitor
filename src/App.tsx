@@ -48,6 +48,21 @@ type MainTab = 'view' | 'add' | 'log' | 'settings' | 'slack';
 // 켜면 SSE 를 구독해, 서버가 점검을 끝낼 때마다 push 받아 화면을 갱신한다.
 // 폴링 주기를 맞출 필요가 없다(결과가 생기는 시점에 서버가 알려줌).
 type AutoRefresh = { enabled: boolean };
+// 추이 그래프에 표시할 점 개수(이 브라우저 한정) — 원본 맥북앱처럼 사용자가 직접 조절(1~1000).
+const GRAPH_POINTS_KEY = 'pm.graphPoints';
+const GRAPH_POINTS_MIN = 1;
+const GRAPH_POINTS_MAX = 1000;
+const GRAPH_POINTS_DEFAULT = 30;
+function loadGraphPoints(): number {
+  try {
+    const n = Number(localStorage.getItem(GRAPH_POINTS_KEY));
+    if (Number.isFinite(n) && n >= GRAPH_POINTS_MIN && n <= GRAPH_POINTS_MAX) return Math.round(n);
+  } catch {
+    /* 무시 */
+  }
+  return GRAPH_POINTS_DEFAULT;
+}
+
 const AUTO_REFRESH_KEY = 'pm.autoRefresh';
 function loadAutoRefresh(): AutoRefresh {
   try {
@@ -279,24 +294,42 @@ function PageView({
 }) {
   const [pages, setPages] = useState<PageTarget[]>([]);
   const [byPage, setByPage] = useState<Map<number, CheckResult>>(new Map());
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  // 여러 페이지를 동시에 펼쳐 그래프를 나란히 비교할 수 있게 Set 으로 관리(단일 아코디언 아님).
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [apiCache, setApiCache] = useState<Map<number, PageApiRow[]>>(new Map());
   const [historyCache, setHistoryCache] = useState<Map<number, HistoryPoint[]>>(new Map());
+  const [graphPoints, setGraphPoints] = useState<number>(loadGraphPoints); // 추이 표시 개수(사용자 조절)
   const reloadKeyRef = useRef(reloadKey);
-  const expandedRef = useRef(expandedId); // 자동 갱신 effect 에서 현재 펼친 페이지 참조용
-  expandedRef.current = expandedId;
+  const expandedRef = useRef(expandedIds); // 자동 갱신/단건 점검 effect 에서 현재 펼친 페이지들 참조용
+  expandedRef.current = expandedIds;
+  const graphPointsRef = useRef(graphPoints); // effect 클로저에서 최신 표시 개수 참조용
+  graphPointsRef.current = graphPoints;
 
   useEffect(() => {
     reloadKeyRef.current = reloadKey;
     let cancelled = false;
+    const keepExpanded = expandedRef.current; // 재점검/CRUD 후에도 펼쳐 둔 그래프는 유지
     Promise.all([api.pages(), api.latest()])
       .then(([ps, latest]) => {
         if (cancelled) return;
         setPages(ps);
         setByPage(new Map(latest.map(r => [r.pageId, r])));
-        setApiCache(new Map()); // 재점검으로 매핑이 갱신됐으니 펼침 캐시 무효화
-        setHistoryCache(new Map()); // 추이도 갱신됐으니 무효화
-        setExpandedId(null); // 펼침을 닫아 stale '불러오는 중…' 고착 방지(다시 클릭하면 fresh)
+        setApiCache(new Map()); // 매핑이 갱신됐을 수 있으니 캐시 무효화 후, 펼친 것만 다시 로드
+        setHistoryCache(new Map());
+        // 삭제된 페이지는 펼침에서 빼고, 남은 펼친 페이지들은 API·추이를 다시 받아 채운다(펼침 유지).
+        const stillOpen = new Set([...keepExpanded].filter(id => ps.some(p => p.id === id)));
+        setExpandedIds(stillOpen);
+        for (const id of stillOpen) {
+          Promise.all([api.pageApis(id), api.pageHistory(id, graphPointsRef.current)])
+            .then(([apis, history]) => {
+              if (cancelled) return;
+              setApiCache(prev => new Map(prev).set(id, apis));
+              setHistoryCache(prev => new Map(prev).set(id, history));
+            })
+            .catch(() => {
+              /* 개별 펼침 재로드 실패는 무시(행 클릭하면 다시 시도) */
+            });
+        }
       })
       .catch(e => {
         if (!cancelled) onErr(String(e));
@@ -317,11 +350,11 @@ function PageView({
         if (!cancelled) setByPage(new Map(latest.map(r => [r.pageId, r])));
       }),
     ];
-    if (exp !== null) {
-      // 펼쳐 둔 페이지의 추이 라인차트도 최신 점까지 갱신.
+    // 펼쳐 둔 모든 페이지의 추이 라인차트를 최신 점까지 갱신(여러 개 동시 펼침 지원).
+    for (const id of exp) {
       tasks.push(
-        api.pageHistory(exp).then(h => {
-          if (!cancelled) setHistoryCache(prev => new Map(prev).set(exp, h));
+        api.pageHistory(id, graphPointsRef.current).then(h => {
+          if (!cancelled) setHistoryCache(prev => new Map(prev).set(id, h));
         }),
       );
     }
@@ -334,18 +367,21 @@ function PageView({
   }, [refreshTick]);
 
   async function toggle(pageId: number) {
-    if (expandedId === pageId) {
-      setExpandedId(null);
-      return;
-    }
-    setExpandedId(pageId);
+    const isOpen = expandedRef.current.has(pageId);
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (isOpen) next.delete(pageId);
+      else next.add(pageId);
+      return next;
+    });
+    if (isOpen) return; // 접는 거면 데이터 로드 불필요
     if (!apiCache.has(pageId)) {
       const at = reloadKeyRef.current;
       try {
         // 추이(history)와 호출 API 를 함께 불러온다.
         const [apis, history] = await Promise.all([
           api.pageApis(pageId),
-          api.pageHistory(pageId),
+          api.pageHistory(pageId, graphPointsRef.current),
         ]);
         if (reloadKeyRef.current !== at) return; // 그 사이 재점검됨 → stale 응답 폐기
         setApiCache(prev => new Map(prev).set(pageId, apis));
@@ -388,9 +424,83 @@ function PageView({
     }
   }
 
+  // 개별 페이지 즉시 점검(행 ↻) — 그 행 결과만 갱신. 펼쳐져 있으면 추이·API 목록도 함께 갱신(펼침 유지).
+  // (자동 갱신 ON 이면 broadcast 로 곧 전체 갱신도 오지만, 누른 즉시 반응을 위해 이 행만 먼저 부분 갱신 — 무해)
+  async function checkOne(pageId: number) {
+    try {
+      const r = await api.checkPage(pageId);
+      if (r) setByPage(prev => new Map(prev).set(pageId, r));
+      if (expandedRef.current.has(pageId)) {
+        const [apis, history] = await Promise.all([
+          api.pageApis(pageId),
+          api.pageHistory(pageId, graphPointsRef.current),
+        ]);
+        setApiCache(prev => new Map(prev).set(pageId, apis));
+        setHistoryCache(prev => new Map(prev).set(pageId, history));
+      }
+    } catch (e) {
+      onErr(String(e));
+    }
+  }
+
+  // 추이 표시 개수 변경(이 브라우저에 기억) — 펼쳐 둔 그래프들을 새 개수로 다시 로드.
+  function changeGraphPoints(n: number) {
+    const v = Math.min(GRAPH_POINTS_MAX, Math.max(GRAPH_POINTS_MIN, Math.round(n)));
+    setGraphPoints(v);
+    try {
+      localStorage.setItem(GRAPH_POINTS_KEY, String(v));
+    } catch {
+      /* 저장 실패해도 이번 세션 동안은 동작 */
+    }
+    for (const id of expandedRef.current) {
+      api
+        .pageHistory(id, v)
+        .then(h => setHistoryCache(prev => new Map(prev).set(id, h)))
+        .catch(() => {
+          /* 개별 재로드 실패는 무시 */
+        });
+    }
+  }
+
   return (
     <>
-      <p className="hint">페이지 행을 클릭하면 그 페이지가 호출한 API 목록이 펼쳐집니다.</p>
+      <p className="hint">
+        페이지 행을 클릭하면 API 목록·추이 그래프가 펼쳐집니다. 여러 개를 동시에 펼쳐 나란히 비교할 수 있어요.
+        <label style={{ marginLeft: 8 }}>
+          추이{' '}
+          <input
+            type="number"
+            min={GRAPH_POINTS_MIN}
+            max={GRAPH_POINTS_MAX}
+            value={graphPoints}
+            title={`최근 점검 ${GRAPH_POINTS_MIN}~${GRAPH_POINTS_MAX}개까지 표시`}
+            onChange={e => {
+              const v = Number(e.target.value);
+              if (Number.isFinite(v) && v > 0) changeGraphPoints(v);
+            }}
+            style={{ width: 64 }}
+          />{' '}
+          개씩
+        </label>
+        {expandedIds.size > 0 && (
+          <button
+            type="button"
+            onClick={() => setExpandedIds(new Set())}
+            style={{
+              marginLeft: 8,
+              background: 'none',
+              border: 'none',
+              color: '#6ea8fe',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              padding: 0,
+              font: 'inherit',
+            }}
+          >
+            모두 접기 ({expandedIds.size})
+          </button>
+        )}
+      </p>
       <table>
         <thead>
           <tr>
@@ -416,13 +526,14 @@ function PageView({
                 key={p.id}
                 page={p}
                 result={byPage.get(p.id)}
-                expanded={expandedId === p.id}
+                expanded={expandedIds.has(p.id)}
                 apis={apiCache.get(p.id)}
                 history={historyCache.get(p.id)}
                 thresholds={thresholds}
                 onToggle={() => toggle(p.id)}
                 onSave={patch => savePage(p.id, patch)}
                 onDelete={() => remove(p.id, p.label)}
+                onCheck={() => checkOne(p.id)}
                 onApiChanged={() => reloadApis(p.id)}
                 onErr={onErr}
               />
@@ -444,6 +555,7 @@ function PageRow({
   onToggle,
   onSave,
   onDelete,
+  onCheck,
   onApiChanged,
   onErr,
 }: {
@@ -456,11 +568,13 @@ function PageRow({
   onToggle: () => void;
   onSave: (patch: { label: string; group: string | null; loginRequired: boolean }) => void;
   onDelete: () => void;
+  onCheck: () => Promise<void> | void;
   onApiChanged: () => void;
   onErr: Notify;
 }) {
   const slow = result?.ok && result.durationMs >= thresholds.warningMs;
   const [editing, setEditing] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [dLabel, setDLabel] = useState(page.label);
   const [dGroup, setDGroup] = useState(page.group ?? '');
   const [dLogin, setDLogin] = useState(page.login_required === 1);
@@ -479,6 +593,14 @@ function PageRow({
   }
   function cancelEdit() {
     setEditing(false);
+  }
+  async function doCheck() {
+    setChecking(true);
+    try {
+      await onCheck();
+    } finally {
+      setChecking(false);
+    }
   }
   // 편집 input 공통 키 처리 (Enter 저장 / Esc 취소)
   const onKey = (e: KeyboardEvent) => {
@@ -539,8 +661,12 @@ function PageRow({
               />
               로그인 필요
             </label>
+          ) : result?.error ? (
+            result.error
+          ) : result ? (
+            (result.apiFailCount ?? 0) > 0 ? `정상 (API ${result.apiFailCount}건 오류)` : '정상'
           ) : (
-            (result?.error ?? (result ? '정상' : '미점검'))
+            '미점검'
           )}
         </td>
         <td className="num row-actions">
@@ -555,6 +681,17 @@ function PageRow({
             </>
           ) : (
             <>
+              <button
+                className="iconbtn"
+                title="이 페이지만 즉시 점검"
+                disabled={checking}
+                onClick={e => {
+                  stop(e); // 행 클릭(펼침)과 분리
+                  doCheck();
+                }}
+              >
+                {checking ? '⏳' : '↻'}
+              </button>
               <button
                 className="iconbtn"
                 title="수정 (이름·그룹·로그인필요)"
@@ -1572,6 +1709,31 @@ function CheckDetailModal({
               <dd className="modal-err">{point.error}</dd>
             </>
           ) : null}
+          {!point.sessionExpired && (point.apiFailCount ?? 0) > 0 ? (
+            <>
+              <dt>API 오류</dt>
+              <dd>같은 사이트 API {point.apiFailCount}건 실패 (5xx/연결 실패)</dd>
+            </>
+          ) : null}
+          {point.body ? (
+            <>
+              <dt>응답/요약</dt>
+              <dd>
+                <pre
+                  style={{
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    maxHeight: 220,
+                    overflow: 'auto',
+                    margin: 0,
+                    fontSize: 12,
+                  }}
+                >
+                  {point.body}
+                </pre>
+              </dd>
+            </>
+          ) : null}
         </dl>
       </div>
     </div>
@@ -1802,8 +1964,9 @@ function SettingsView({
         rows={[
           { key: 'warningMs', label: '주의 (ms)', kind: 'num', min: 0, max: 600000 },
           { key: 'criticalMs', label: '심각 (ms)', kind: 'num', min: 0, max: 600000 },
+          { key: 'failOnApiError', label: 'API 오류를 실패로 (기본 꺼짐)', kind: 'bool' },
         ]}
-        note="응답시간이 주의 이상이면 🟡, 심각 이상이면 🔴 로 표시 (응답 실패는 ❌)"
+        note="응답시간이 주의 이상이면 🟡, 심각 이상이면 🔴 (응답 실패는 ❌). 'API 오류를 실패로'를 켜면 페이지가 호출한 같은 사이트 API가 5xx/연결 실패일 때 그 페이지를 ❌ 로 본다(HTML은 200이어도 데이터가 깨진 경우 포착). ⚠️ 인증 토큰 갱신·분석 등 '부수 API'의 일시적 5xx까지 실패로 잡혀 거짓 경보가 날 수 있어 기본은 꺼져 있다 — 그 페이지의 API가 깨지면 정말 장애인 경우에만 켜세요."
         onSave={save}
         onErr={onErr}
       />

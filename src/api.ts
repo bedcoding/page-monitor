@@ -64,6 +64,7 @@ export const api = {
   ) => patch<{ updated: boolean }>(`/api/pages/${id}`, p),
   deletePage: (id: number) => del<{ deleted: boolean }>(`/api/pages/${id}`),
   runCheck: () => post<CheckResult[]>('/api/check'),
+  checkPage: (id: number) => post<CheckResult | null>(`/api/pages/${id}/check`),
   latest: () => get<CheckResult[]>('/api/results/latest'),
   session: () => get<SessionStatus>('/api/session'),
   pageApis: (id: number) => get<PageApiRow[]>(`/api/pages/${id}/apis`),
@@ -77,7 +78,8 @@ export const api = {
     ),
   testApi: (id: number, method: string, url: string) =>
     post<ApiTestResult>(`/api/pages/${id}/apis/test`, { method, url }),
-  pageHistory: (id: number) => get<HistoryPoint[]>(`/api/pages/${id}/history`),
+  pageHistory: (id: number, limit = 30) =>
+    get<HistoryPoint[]>(`/api/pages/${id}/history?limit=${limit}`),
   pageDaily: (id: number, days = 30) => get<DailyStat[]>(`/api/pages/${id}/daily?days=${days}`),
   pageChecks: (id: number, date: string) =>
     get<HistoryPoint[]>(`/api/pages/${id}/checks?date=${date}`),

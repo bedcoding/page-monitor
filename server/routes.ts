@@ -22,7 +22,7 @@ import {
   updateSlackSettings,
   listAlarmEvents,
 } from './db';
-import { checkAllPages, sessionStatus, testApiCall } from './checker';
+import { checkAllPages, sessionStatus, testApiCall, navTimeoutFor, didEnterPage } from './checker';
 import { schedulerStatus, tryAcquireCheck, releaseCheck, reconfigure } from './scheduler';
 import { addClient, broadcast } from './events';
 import { testSlack, evaluateAndNotify } from './slack';
@@ -180,13 +180,18 @@ export function registerRoutes(app: FastifyInstance): void {
     try {
       const pages = listPages();
       const cfg = getConfig();
-      const outcomes = await checkAllPages(pages, cfg.loginPattern);
+      const s = getSettings();
+      const outcomes = await checkAllPages(pages, cfg.loginPattern, {
+        failOnApiError: s.failOnApiError,
+        navTimeoutMs: navTimeoutFor(s.criticalMs),
+      });
       const results = outcomes.map(o => o.result);
       recordChecks(results);
       // 점검하는 '그 김에' 수집된 페이지별 호출 API 도 저장.
-      // 단, 세션 만료(로그인 페이지로 튕김)나 실패한 점검의 API 는 그 페이지의 것이 아니므로 제외.
+      // 진입 성공(HTML 2xx/3xx)이면 저장 — API 오류로 강등(ok=false)된 페이지도 그 회차 API 매핑은 보존한다.
+      // (세션 만료·HTTP 4xx5xx·로드 실패만 제외)
       for (const o of outcomes) {
-        if (o.result.sessionExpired || !o.result.ok) continue;
+        if (!didEnterPage(o.result)) continue;
         recordApiCalls(o.result.pageId, o.apis);
       }
       // 구독 중인 다른 대시보드에도 "방금 점검 끝남" 푸시(누른 본인은 이 응답으로 바로 갱신)
@@ -194,6 +199,40 @@ export function registerRoutes(app: FastifyInstance): void {
       // 슬랙 알람 평가/발송(꺼져 있으면 즉시 반환). 실패해도 점검 응답은 정상 반환.
       await evaluateAndNotify().catch(e => console.warn('[slack] notify failed:', e));
       return results;
+    } finally {
+      releaseCheck();
+    }
+  });
+
+  // 개별 페이지 즉시 점검 — 전체를 돌리지 않고 한 페이지만 다시 확인(행 ↻ 버튼). 전체 점검과 락 공유.
+  // (락 공유라 단건 점검 중엔 그 짧은 동안 정시 cron 회차가 스킵될 수 있으나, 단건은 1페이지라 수초 내 끝나 영향 미미.)
+  app.post('/api/pages/:id/check', async (req, reply) => {
+    const id = Number((req.params as { id: string }).id);
+    if (!Number.isInteger(id)) return reply.code(400).send({ error: '잘못된 id' });
+    const page = listPages().find(p => p.id === id);
+    if (!page) return reply.code(404).send({ error: '해당 페이지가 없습니다.' });
+    if (!tryAcquireCheck()) {
+      return reply.code(409).send({ error: '이미 점검이 진행 중입니다. 잠시 후 다시 시도하세요.' });
+    }
+    try {
+      const cfg = getConfig();
+      const s = getSettings();
+      const outcomes = await checkAllPages([page], cfg.loginPattern, {
+        failOnApiError: s.failOnApiError,
+        navTimeoutMs: navTimeoutFor(s.criticalMs),
+      });
+      const results = outcomes.map(o => o.result);
+      recordChecks(results);
+      // 진입 성공이면 API 매핑 저장(강등돼도 보존). 전체 점검과 동일 규칙.
+      for (const o of outcomes) {
+        if (!didEnterPage(o.result)) continue;
+        recordApiCalls(o.result.pageId, o.apis);
+      }
+      broadcast({ type: 'checked', source: 'manual', at: new Date().toISOString() });
+      // 단건 점검은 '그 페이지만' 슬랙 평가 — 전체 평가하면 새 점검이 없는 다른 페이지의
+      // 복구/발동 판정을 건드려 잘못된 알람이 나갈 수 있다.
+      await evaluateAndNotify(id).catch(e => console.warn('[slack] notify failed:', e));
+      return results[0] ?? null;
     } finally {
       releaseCheck();
     }
@@ -336,11 +375,12 @@ export function registerRoutes(app: FastifyInstance): void {
     return { deleted: true };
   });
 
-  // 특정 페이지의 점검 이력(추이용) — 오래된→최신 순
+  // 특정 페이지의 점검 이력(추이용) — 오래된→최신 순. ?limit= 으로 표시 개수 지정(기본 30, db 가 1~1000 클램프)
   app.get('/api/pages/:id/history', async req => {
     const id = Number((req.params as { id: string }).id);
     if (!Number.isInteger(id)) return [];
-    return pageHistory(id);
+    const limit = Number((req.query as { limit?: string }).limit) || 30;
+    return pageHistory(id, limit);
   });
 
   // 로그 탭 — 일별 집계(막대) · ?days=30
@@ -431,6 +471,7 @@ export function registerRoutes(app: FastifyInstance): void {
             warningMs: { type: 'number' },
             criticalMs: { type: 'number' },
             retentionDays: { type: 'number' },
+            failOnApiError: { type: 'boolean' },
           },
         },
       },

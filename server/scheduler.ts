@@ -1,6 +1,6 @@
 import cron, { type ScheduledTask } from 'node-cron';
 import { listPages, recordChecks, recordApiCalls, pruneHistory, getSettings } from './db';
-import { checkAllPages } from './checker';
+import { checkAllPages, navTimeoutFor, didEnterPage } from './checker';
 import { broadcast } from './events';
 import { evaluateAndNotify } from './slack';
 import { getConfig } from './config';
@@ -63,11 +63,15 @@ export async function runScheduledCheck(): Promise<void> {
       return;
     }
     const cfg = getConfig();
-    const outcomes = await checkAllPages(pages, cfg.loginPattern);
+    const s = getSettings();
+    const outcomes = await checkAllPages(pages, cfg.loginPattern, {
+      failOnApiError: s.failOnApiError,
+      navTimeoutMs: navTimeoutFor(s.criticalMs),
+    });
     recordChecks(outcomes.map(o => o.result));
-    // 세션 만료/실패 점검의 API 는 그 페이지의 것이 아니므로 제외(수동 점검과 동일 규칙).
+    // 진입 성공(HTML 2xx/3xx)이면 API 매핑 저장 — API 오류로 강등된 페이지도 그 회차 매핑은 보존(수동과 동일).
     for (const o of outcomes) {
-      if (o.result.sessionExpired || !o.result.ok) continue;
+      if (!didEnterPage(o.result)) continue;
       recordApiCalls(o.result.pageId, o.apis);
     }
     const okN = outcomes.filter(o => o.result.ok).length;
